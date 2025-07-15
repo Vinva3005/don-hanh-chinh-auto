@@ -1,16 +1,24 @@
 
 import streamlit as st
+import requests
 from PIL import Image
-import pytesseract
 from docx import Document
 from io import BytesIO
 
 st.set_page_config(page_title="Điền đơn hành chính", layout="centered")
 st.title("📝 Tự động điền đơn hành chính từ giấy tờ")
 
-def extract_info_from_image(uploaded_img):
-    image = Image.open(uploaded_img)
-    text = pytesseract.image_to_string(image, lang='eng+vie')
+OCR_API_KEY = "helloworld"  # Miễn phí từ OCR.space
+
+def extract_info_from_image_api(image_file):
+    url_api = "https://api.ocr.space/parse/image"
+    result = requests.post(
+        url_api,
+        files={"filename": image_file},
+        data={"apikey": OCR_API_KEY, "language": "vie"},
+    )
+    result_json = result.json()
+    text = result_json.get("ParsedResults", [{}])[0].get("ParsedText", "")
     info = {'Họ và tên': '', 'Ngày sinh': '', 'Số định danh': '', 'Quê quán': '', 'Nơi thường trú': ''}
     lines = text.split("\n")
     for line in lines:
@@ -18,7 +26,7 @@ def extract_info_from_image(uploaded_img):
             info['Họ và tên'] = line.split(":")[-1].strip()
         elif 'Ngày sinh' in line:
             info['Ngày sinh'] = line.split(":")[-1].strip()
-        elif 'Số' in line and 'CCCD' in line:
+        elif 'Số' in line and any(x in line for x in ['CCCD', 'CMND', 'CMT']):
             info['Số định danh'] = ''.join(filter(str.isdigit, line))
         elif 'Quê quán' in line:
             info['Quê quán'] = line.split(":")[-1].strip()
@@ -43,9 +51,9 @@ uploaded_img = st.file_uploader("Tải ảnh giấy tờ (JPG/PNG)", type=['jpg'
 user_data = {'Họ và tên': '', 'Ngày sinh': '', 'Số định danh': '', 'Quê quán': '', 'Nơi thường trú': ''}
 if uploaded_img:
     st.image(uploaded_img, caption="Ảnh đã tải", use_column_width=True)
-    with st.spinner("Đang trích xuất thông tin..."):
-        user_data = extract_info_from_image(uploaded_img)
-    st.success("✅ Trích xuất thành công!")
+    with st.spinner("Đang gửi tới API nhận dạng..."):
+        user_data = extract_info_from_image_api(uploaded_img)
+    st.success("✅ Đã nhận dạng xong!")
 
 st.subheader("2. Điền thông tin bổ sung")
 with st.form("form_thong_tin"):

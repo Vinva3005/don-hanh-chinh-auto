@@ -1,4 +1,4 @@
 streamlit
-pytesseract
+requests
 python-docx
 Pillow
